@@ -79,14 +79,14 @@ PROGRAMMER_MCU=m328p
 
 # Name of our project
 # (use a single word, e.g. 'myproject')
-PROJECTNAME=7segx3
+PROJECTNAME=zcross
 
 # Source files
 # List C/C++/Assembly source files:
 # (list all files to compile, e.g. 'a.c b.cpp as.S'):
 # Use .cc, .cpp or .C suffix for C++ files, use .S 
 # (NOT .s !!!) for assembly source code files.
-PRJSRC=7segx3.c
+PRJSRC=main.c
 
 # additional includes (e.g. -I/path/to/mydir)
 INC=
@@ -96,7 +96,7 @@ LIBS=
 
 # Optimization level, 
 # use s (size opt), 1, 2, 3 or 0 (off)
-OPTLEVEL=s
+OPTLEVEL=2
 
 
 #####      AVR Dude 'writeflash' options       #####
