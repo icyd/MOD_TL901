@@ -169,13 +169,14 @@ OBJCOPY=avr-objcopy
 OBJDUMP=avr-objdump
 SIZE=avr-size
 AVRDUDE=avrdude
+FLASHTOOL=~/github/NSTloader/tools/./flasher.sh
 REMOVE=rm -f
 
 ##### automatic target names ####
 TRG=$(PROJECTNAME).out
 DUMPTRG=$(PROJECTNAME).s
 
-HEXROMTRG=$(PROJECTNAME).hex 
+HEXROMTRG=$(PROJECTNAME).hex
 HEXTRG=$(HEXROMTRG) $(PROJECTNAME).ee.hex
 GDBINITFILE=gdbinit-$(PROJECTNAME)
 
@@ -231,7 +232,8 @@ writeflash: hex
 	 -p $(PROGRAMMER_MCU) -P $(AVRDUDE_PORT) -e        \
 	 -U flash:w:$(HEXROMTRG)
 
-install: writeflash
+install: hex
+	$(FLASHTOOL) --mcu=$(MCU) -w $(HEXROMTRG)
 
 $(DUMPTRG): $(TRG) 
 	$(OBJDUMP) -S  $< > $@

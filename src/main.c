@@ -1,9 +1,11 @@
 #include "main.h"
 
-volatile uint8_t triacTime;
+volatile uint8_t triacTime = 0;
+volatile uint8_t adcData;
+volatile uint8_t adcAvg;
 
 int main(void){
-
+    uint8_t over=0;
     //ADC Setup
     ADMUX |= ((1<<REFS0)|(1<<MUX2)|(1<<MUX0));
     ADCSRA |= ((1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2)|(1<<ADIE));
@@ -11,6 +13,7 @@ int main(void){
     //Uart setup
     UBRR0H = UBRRH_VALUE;
     UBRR0L = UBRRL_VALUE;
+    UCSR0B |= (1<<RXCIE0);
     UCSR0C |= (1<<UCSZ00)|(1<<UCSZ01)|(1<<UPM01);
 
     //Timer setup
@@ -24,8 +27,25 @@ int main(void){
 
     //Interruptions Enable
     sei();
+    UART_ENA();
+    TRIAC_ENA();
+    TRIAC_OFF();
+    TIMER_CLR();
+    /*INT0IE_ENA();*/
+    TCCR1B |= (1<<CS11)|(1<<CS10);
 
     while(1){
+        if(TIFR1 & (1<<TOV1)){
+            TIFR1 |= (1<<TOV1);
+             over++;
+             if(over >= 2){
+                 over=0;
+                 if(triacTime){
+                     uart_tx(adcData);
+                     uart_tx(adcAvg);
+                 }
+                 }
+        }
         /*if(send){*/
             /*while(! UART_FREE()){}*/
             /*UDR0 = eeprom_read_byte((uint8_t *)(s - EE_OFFSET));*/
@@ -49,21 +69,32 @@ uint16_t ewma(uint16_t sample){
     return average;
 }
 
+void uart_tx(uint8_t data){
+    while(!UART_FREE());
+    UDR0 = data;
+}
+
 ISR(TIMER0_OVF_vect){
     TIMER_DIS();
-    TRIAC_OFF();
-    INT0IE_ENA();
+    if(triacTime)
+        TRIAC_ON();
+    /*INT0IE_ENA();*/
 }
 
 ISR(INT0_vect){
-    INT0IR_DIS();
-    TCNT0 = triacTime;
-    TRIAC_ON();
+    /*INT0IE_DIS();*/
+    TRIAC_OFF();
+    TIMER_UPD(triacTime);
     TIMER_ENA();
     ADC_SC();
 }
 
 ISR(ADC_vect){
-    s = ADCL | (ADCH<<8);
-    r = ewma(s);
+    adcData = (uint8_t)(ADCL | (ADCH<<8));
+    adcAvg = (uint8_t)ewma(adcData);
+}
+
+ISR(USART_RX_vect){
+    triacTime = UDR0;
+    UDR0 = triacTime;
 }

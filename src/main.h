@@ -20,8 +20,8 @@
 #define EE_OFFSET 183
 #define TEMP_MIN   25
 #define TEMP_MAX  200
-#define TIME_L      6
-#define TIME_H    254
+#define TIME_L      7
+#define TIME_H    253
 #define DDRT     DDRB
 #define PORTT    PORTB
 #define PINT     PB1
@@ -34,17 +34,21 @@
 
 #define TIMER_ENA()  (TCCR0B |= (1<<CS02)) //Preescaler 256
 #define TIMER_DIS()  (TCCR0B &= ~(1<<CS02))
-#define TIMER_CLR()  (TCNT0 = 0)
+#define TIMER_UPD(x) (TCNT0 = x)
+#define TIMER_CLR()  (TIMER_UPD(0))
 
-#define UART_ENA()   (UCSR0B |= (1<<TXEN0))
+#define UART_ENA()   (UCSR0B |= (1<<TXEN0) | (1<<RXEN0))
 #define UART_DIS()   (UCSR0B &= ~(1<<TXEN0))
 #define UART_FREE()  (UCSR0A & (1<<UDRE0))
 
 #define INT0IE_ENA() (EIMSK |= (1<<INT0))
 #define INT0IE_DIS() (EIMSK &= ~(1<<INT0))
+#define TRIAC_ENA()  (DDRT |= (1<<PINT))
 #define TRIAC_ON()   (PORTT |= (1<<PINT))
 #define TRIAC_OFF()  (PORTT &= ~(1<<PINT))
 
 uint16_t ewma(uint16_t sample);
+void uart_tx(uint8_t data);
+//uint8_t uart_rx(void);
 
 #endif
