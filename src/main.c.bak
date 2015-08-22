@@ -1,0 +1,110 @@
+#include "main.h"
+
+volatile uint8_t triacTime = 0;
+volatile uint8_t onChange = 0;
+volatile uint16_t adcData = 0;
+volatile uint8_t adcAvg = 0;
+
+int main(void){
+    uint8_t over = 0;
+    //ADC Setup
+    ADMUX |= ((1<<REFS0)|(1<<MUX2)|(1<<MUX0));
+    ADCSRA |= ((1<<ADPS0)|(1<<ADPS1)|(1<<ADPS2)|(1<<ADIE));
+
+    //Uart setup
+    UBRR0H = UBRRH_VALUE;
+    UBRR0L = UBRRL_VALUE;
+    UCSR0B |= (1<<RXCIE0);
+    UCSR0C |= (1<<UCSZ00)|(1<<UCSZ01)|(1<<UPM01);
+
+    //Timer setup
+    /* TIMSK0 |= (1<<TOIE0); */
+
+    //External interrupt setup
+    EICRA |= (1<<ISC01);
+
+    //Output port setup
+    TRIAC_ENA();
+
+    //Interruptions Enable
+    UART_ENA();
+    INT0IE_ENA();
+    TIMSK1 |= (1<<OCIE1A) | (1<<TOIE1);
+    ADC_ENA();
+    sei();
+
+    ADC_SC();
+    TCCR0B |= (1<<CS02) | (1<<CS00);
+
+    while(1){
+        if(TIFR0 & (1<<TOV0)){
+            TIFR0 |= (1<<TOV0);
+             over++;
+             if(over >= 30){
+                 over=0;
+                 adcData -= EE_OFFSET;
+                 /* adcData = ewma(adcData); */
+                 /* uart_tx((uint8_t)(adcData>>8)); */
+                 /* uart_tx((uint8_t)adcData); */
+                 adcAvg = eeprom_read_byte((uint8_t *)adcData);
+                 uart_tx(adcAvg);
+                 /* ADC_SC(); */
+                 }
+        }
+        if(onChange){
+            if(triacTime == 0x55){
+                TCOMP_UPD(65245);
+                TIMER_ENA();
+            }
+            else if(triacTime == 0xAA){
+                TCOMP_UPD(64697);
+                TIMER_ENA();
+            }
+            else {
+                TIMER_DIS();
+            }
+            onChange = 0;
+        }
+    };
+}
+
+uint16_t ewma(uint16_t sample){
+    //Calculates the exponential weighted moving average with alpha = 0,75
+    static uint16_t average = 821;
+
+    average = ((average * 3) + sample)>>2;
+
+    return average;
+}
+
+void uart_tx(uint8_t data){
+    while(!UART_FREE());
+    UDR0 = data;
+}
+
+/* ISR(TIMER0_OVF_vect){ */
+/* } */
+
+ISR(INT0_vect){
+    TCOUNT_UPD(TIME_BASE);
+    ADC_SC();
+}
+
+ISR(TIMER1_OVF_vect){
+    TRIAC_OFF();
+}
+
+ISR(TIMER1_COMPA_vect){
+    TRIAC_ON();
+}
+
+
+ISR(ADC_vect){
+    adcData = ADCL | (ADCH<<8);
+}
+
+ISR(USART_RX_vect){
+    onChange = triacTime;
+    triacTime = UDR0;
+    onChange = (onChange == triacTime) ? 0 : 1;
+}
