@@ -1,10 +1,11 @@
 #include "main.h"
 #include <avr/pgmspace.h>
 
+volatile uint8_t mainsTick = 0;
 volatile uint8_t triacPow = 0;
 volatile uint8_t onChange = 0;
 volatile uint16_t adcData = 0;
-volatile uint8_t adcAvg = 0;
+volatile uint16_t adcAvg = 0;
 //Variable stored in program mem. that contains the correct value to get
 //a power range from 0% to 100% from the heater
 const uint16_t vrmsTriac[] PROGMEM = { 57305, 57362, 57459, 57549, 57639, 57720,
@@ -24,6 +25,11 @@ const uint16_t vrmsTriac[] PROGMEM = { 57305, 57362, 57459, 57549, 57639, 57720,
                                        62163, 62245, 62326, 62408, 62505, 62595,
                                        62692, 62798, 62912, 63026, 63164, 63303,
                                        63466, 63653, 63889, 64214, 65427 };
+typedef struct {
+    int16_t iState;
+    int16_t Ki;
+    int16_t Kp;
+} PI;
 
 int main(void){
     uint8_t over = 0;
@@ -55,11 +61,23 @@ int main(void){
     sei();
 
     ADC_SC();
-    TCCR0B |= (1<<CS02) | (1<<CS00);
+
+    //8 bits Timer setup: 1024 preescaler = 128 us
+    /* TCCR0B |= (1<<CS02) | (1<<CS00); */
 
     triacPow = 0;
 
     while(1){
+        if(mainsTick >= MT_MAX){
+            mainsTick = 0;
+            if(adcData <= INPUT_MIN)
+                adcData = 0;
+            else if(adcData >= INPUT_MAX)
+                adcData = LIM_MAX;
+            else
+                adcData -= EE_OFFSET;
+            filteredTemp = eeprom_read_byte((uint8_t *)ewma(adcData));
+        }
         if(TIFR0 & (1<<TOV0)){
             TIFR0 |= (1<<TOV0);
              over++;
@@ -72,39 +90,21 @@ int main(void){
                  }
                  else
                      adcData = 0;
-                 /* adcData = ewma(adcData); */
-                 /* uart_tx((uint8_t)(adcData>>8)); */
-                 /* uart_tx((uint8_t)adcData); */
-                 adcAvg = eeprom_read_byte((uint8_t *)adcData);
-                 uart_tx(adcAvg);
-                 /* ADC_SC(); */
+                 if (adcAvg > EE_OFFSET){
+                      adcAvg -= EE_OFFSET;
+                    if (adcAvg > LIM_MAX)
+                        adcAvg = LIM_MAX;
                  }
-        }
-        if(onChange){
-            if(triacPow == 0x55){
-                TCOMP_UPD(62093);
-                TIMER_ENA();
+                 else
+                     adcAvg = 0;
+                 uart_tx(eeprom_read_byte((uint8_t *)adcData));
             }
-            else if(triacPow == 0xAA){
-                TCOMP_UPD(61572);
-                TIMER_ENA();
-            }
-            else {
-                TIMER_DIS();
-                TRIAC_OFF();
-            }
-            onChange = 0;
         }
     };
 }
 
-uint16_t ewma(uint16_t sample){
-    //Calculates the exponential weighted moving average with alpha = 0,75
-    static uint16_t average = 821;
+uint16_t update_pi(uint8_t input, uint8_t setPoint){
 
-    average = ((average * 3) + sample)>>2;
-
-    return average;
 }
 
 void uart_tx(uint8_t data){
@@ -117,6 +117,7 @@ void uart_tx(uint8_t data){
 
 ISR(INT0_vect){
     TCOUNT_UPD(pgm_read_word(&vrmsTriac[triacPow]));
+    mainsTicks++;
     ADC_SC();
 }
 

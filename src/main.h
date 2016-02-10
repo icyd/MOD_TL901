@@ -19,8 +19,11 @@
 //Define of limits
 #define EE_OFFSET 183
 #define LIM_MAX   820
+#define INPUT_MIN EE_OFFSET
+#define INPUT_MAX EE_OFFSET + LIM_MAX
 #define TEMP_MIN   25
 #define TEMP_MAX  200
+#define MT_MAX     12 //for a 0.1s sampling rate
 /* #define TIME_L      7 */
 /* #define TIME_H    253 */
 /* #define TIME_BASE 57405 */
